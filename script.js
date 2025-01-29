@@ -7,8 +7,8 @@ const gameArea = document.getElementById('gameArea');
 
         let score = 0;
         let lives = 3;
-        let gameInterval;
-        let blockInterval;
+        let blocks = [];
+        let gameRunning = true;
 
         document.addEventListener('keydown', moveBasket);
 
@@ -16,43 +16,43 @@ const gameArea = document.getElementById('gameArea');
             const basketRect = basket.getBoundingClientRect();
             const areaRect = gameArea.getBoundingClientRect();
 
-            if (e.key === 'ArrowLeft' || e.key === 'a') {
-                if (basketRect.left > areaRect.left) {
-                    basket.style.left = `${basket.offsetLeft - 20}px`;
-                }
-            } else if (e.key === 'ArrowRight' || e.key === 'd') {
-                if (basketRect.right < areaRect.right) {
-                    basket.style.left = `${basket.offsetLeft + 20}px`;
-                }
+            if ((e.key === 'ArrowLeft' || e.key === 'a') && basketRect.left > areaRect.left) {
+                basket.style.left = `${Math.max(0, basket.offsetLeft - 20)}px`;
+            } else if ((e.key === 'ArrowRight' || e.key === 'd') && basketRect.right < areaRect.right) {
+                basket.style.left = `${Math.min(gameArea.clientWidth - basket.clientWidth, basket.offsetLeft + 20)}px`;
             }
         }
 
         function createBlock() {
             const block = document.createElement('div');
             const isGoodBlock = Math.random() > 0.5;
-            block.classList.add('block');
-            block.classList.add(isGoodBlock ? 'goodBlock' : 'badBlock');
+            block.classList.add('block', isGoodBlock ? 'goodBlock' : 'badBlock');
             block.style.left = `${Math.random() * (gameArea.clientWidth - 20)}px`;
             block.style.top = '0px';
             gameArea.appendChild(block);
+            blocks.push({ element: block, isGood: isGoodBlock, speed: 2 + score * 0.1 });
+        }
 
-            let fallInterval = setInterval(() => {
-                const blockRect = block.getBoundingClientRect();
+        function updateBlocks() {
+            blocks.forEach((block, index) => {
+                if (!gameRunning) return;
+
+                const blockRect = block.element.getBoundingClientRect();
                 const basketRect = basket.getBoundingClientRect();
                 const areaRect = gameArea.getBoundingClientRect();
 
                 if (blockRect.top > areaRect.bottom) {
-                    clearInterval(fallInterval);
-                    block.remove();
+                    block.element.remove();
+                    blocks.splice(index, 1);
                 } else if (
                     blockRect.bottom >= basketRect.top &&
                     blockRect.left < basketRect.right &&
                     blockRect.right > basketRect.left
                 ) {
-                    clearInterval(fallInterval);
-                    block.remove();
-
-                    if (isGoodBlock) {
+                    block.element.remove();
+                    blocks.splice(index, 1);
+                    
+                    if (block.isGood) {
                         score++;
                         scoreDisplay.textContent = `Score: ${score}`;
                     } else {
@@ -63,26 +63,30 @@ const gameArea = document.getElementById('gameArea');
                         }
                     }
                 } else {
-                    block.style.top = `${block.offsetTop + 5}px`;
+                    block.element.style.top = `${block.element.offsetTop + block.speed}px`;
                 }
-            }, 30);
+            });
+            if (gameRunning) {
+                requestAnimationFrame(updateBlocks);
+            }
         }
 
         function startGame() {
             score = 0;
             lives = 3;
+            gameRunning = true;
             scoreDisplay.textContent = `Score: ${score}`;
             livesDisplay.textContent = `Lives: ${lives}`;
             gameOverScreen.style.visibility = 'hidden';
-
-            gameInterval = setInterval(() => {
-                createBlock();
-            }, 1000);
+            blocks.forEach(block => block.element.remove());
+            blocks = [];
+            
+            setInterval(createBlock, 1000);
+            requestAnimationFrame(updateBlocks);
         }
 
         function endGame() {
-            clearInterval(gameInterval);
-            document.querySelectorAll('.block').forEach(block => block.remove());
+            gameRunning = false;
             gameOverScreen.style.visibility = 'visible';
             finalScore.textContent = `Final Score: ${score}`;
         }
